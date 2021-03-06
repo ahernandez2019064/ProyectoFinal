@@ -36,7 +36,7 @@ mongoose.connect('mongodb://localhost:27017/VentaOnline', {useNewUrlParser: true
     })
 
     app.listen(3000, function(){
-        console.log('Servidro corriendo correctamente');
+        console.log('Servidor corriendo correctamente');
     })
 
 }).catch(err => console.log(err))
