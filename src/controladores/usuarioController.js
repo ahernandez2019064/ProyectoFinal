@@ -44,7 +44,7 @@ function registrarCliente(req, res){
         Usuarios.find({nombreUsuario: usuario.nombreUsuario}).exec((err, usuarioEncontrado)=>{
             if(err) return res.status(500).send({ mensaje: 'Error en la peticion de registro' });
             if(usuarioEncontrado && usuarioEncontrado.length >= 1){
-                return res.status(500).send({ mensaje: 'El usuario '+ params.nombreUsuario + 'ya existe' });
+                return res.status(500).send({ mensaje: 'El usuario '+ params.nombreUsuario + ' ya existe' });
             }else{
                 bcrypt.hash(params.password, null, null, (err, passVerifacada)=>{
                     usuario.password = passVerifacada;
@@ -142,20 +142,20 @@ function ascenderUsuario(req, res) {
 
     if(req.user.rol === 'ROL_ADMIN'){
         delete params.password;
-        if(params.rol === 'ROL_ADMIN'){
-            Usuarios.findOneAndUpdate({_id: idUsuario, rol: 'ROL_CLIENTE'}, params, {new: true}, (err, ascensoRealizado)=>{
-                if(err) return res.status(500).send({ mensaje: 'Error en la petición de asceder' });
-                if(!ascensoRealizado) return res.status(500).send({ mensaje: 'No se pueden ascender Usuarios Admin' });
-            })
-        }else{
-            return res.status(500).send({ mensaje: 'Solo puede realizar el ascenso de "ROL_CLIENTE" a  "ROL_ADMIN", por favor verificar su info' })
-        }
+
+        Usuarios.findOneAndUpdate({_id: idUsuario, rol: 'ROL_CLIENTE'},{rol: params.rol}, {new: true}, (err, ascensoRealizado)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la petición de asceder' });
+            if(!ascensoRealizado) return res.status(500).send({ mensaje: 'No se pueden ascender Usuarios Admin' });
+
+            return res.status(200).send({ ascensoRealizado, mensaje: 'El usuario ha sido ascendido' });
+        })
+        
     }else{
         return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta acción' })
     }
 }
 
-// CRUD CLIENTE
+
 
 
 module.exports = {
