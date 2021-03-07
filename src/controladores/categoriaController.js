@@ -53,7 +53,24 @@ function eliminarCategoria(req, res) {
 
 }
 
+function listarCategorias(req, res) {
+    if(req.user.rol === 'ROL_ADMIN'){
+        Categoria.find((err, categoriasEncontradas)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+            if(!categoriasEncontradas) return res.status(500).send({ mensaje: 'No se ha podido encontrar la categorias' })
+
+            return res.status(200).send({ categoriasEncontradas });
+        })
+    }else{
+        return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta accion' })
+    }
+    
+}
+
+
+
 module.exports = {
     agregarCategoria,
-    editarCategoria
+    editarCategoria,
+    listarCategorias
 }
