@@ -1,8 +1,11 @@
 'use strict'
 
 var Usuarios = require('../modelos/usuarioModel');
+var Carrito = require('../modelos/carritoModel');
+var Producto = require('../modelos/productoModel');
 const bcrypt = require('bcrypt-nodejs');
 const jwt = require('../servicios/jwt');
+const { findByIdAndUpdate } = require('../modelos/usuarioModel');
 
 // CRUD ADMINISTRADOR
 function login(req, res){
@@ -155,7 +158,115 @@ function ascenderUsuario(req, res) {
     }
 }
 
+// CRUD CLIENTE
+function registrarCliente(req, res){
+    var usuario = new Usuarios();
+    var params = req.body;
 
+    if(params.nombreUsuario && params.password){
+        usuario.nombreUsuario = params.nombreUsuario;
+        usuario.password = params.password;
+        usuario.rol = 'ROL_CLIENTE';
+
+        Usuarios.find({nombreUsuario: usuario.nombreUsuario}).exec((err, usuarioEncontrado)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de registro' });
+            if(usuarioEncontrado && usuarioEncontrado.length >= 1){
+                return res.status(500).send({ mensaje: 'El usuario '+ params.nombreUsuario + ' ya existe' });
+            }else{
+                bcrypt.hash(params.password, null, null, (err, passVerifacada)=>{
+                    usuario.password = passVerifacada;
+
+                    usuario.save((err, usuarioGuardado)=>{
+                        if(err) return res.status(500).send({ mensaje: 'Error al guardar el usuario' });
+
+                        if(usuarioGuardado){
+                            crearCarritos(carritoUsuario._id);
+                            return res.status(200).send({ usuarioGuardado });
+                        }else{
+                            return res.status(500).send({ mensaje: 'No se ha podido regstrar este usuario' });
+                        }
+                    })
+                })
+            }
+        })
+    }
+}
+
+function eliminarCuenta(req, res) {
+    var idUsuario = req.params.id
+
+    if(idUsuario != req.user.sub){
+        return res.status(500).send({mensaje:'No posee los permisos para eliminar este usuario'});
+    }
+
+    Usuarios.findByIdAndDelete({_id: idUsuario}, (err, clienteEliminado)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de eliminar' });
+        if(!clienteEliminado) return res.status(500).send({ mensaje: 'No se ha podido eliminar su cuenta' });
+
+        return res.status(200).send({ mensaje: 'El usuario ha sido eliminado' })
+    })
+}
+
+function editarCuenta(req, res) {
+    var idUsuario = req.params.id
+    var params = req.body
+
+    delete params.rol;
+
+    if(idUsuario != req.user.sub){
+        return res.status(500).send({ mensaje: 'No posee los permisos para editar esta cuenta' });
+    }
+
+    Usuarios.findByIdAndUpdate({_id: idUsuario}, {new: true}, params, (err, usuarioEditado)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion para eliminaar' });
+        if(!usuarioEditado) return res.status(500).send({ mensaje: 'No se ha podido editar el usuario' });
+
+        return res.status(200).send({ usuarioEditado })
+    })
+}
+
+function crearCarritos(usuarioId) {
+    var carritos = new Carrito();
+    carritos.carritoUsuario = usuarioId;
+    carritos.save();
+}
+
+function agregarProductoCarrito(req, res) {
+    var params = req.body
+    var idProducto = req.params.id
+    var idUsuario = req.user.sub
+
+    if(req.user.rol != 'ROL_CLIENTE'){
+        return res.status(500).send({ mensaje: 'No posee los permisos para agregar productod' });
+    }
+
+    Producto.findById(idProducto).exec((err, productoEncontrado)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+        if(productoEncontrado.cantidad < params.cantidad) return res.status(500).send({ mensaje: `No hay productos suficientes lo maximo que puede escoger es ${productoEncontrado.cantidad}` });
+        if(!productoEncontrado) return res.status(500).send({ mensaje: 'Error al buscar el producto' });
+        if (productoEncontrado.cantidad == 0) return res.status(500).send({mensaje:'No hay prodctos en existencias'});
+
+        var precio = productoEncontrado.precio;
+        var subTotalF = params.cantidad * productoEncontrado.precio;
+
+        Carrito.findOneAndUpdate({ carritoUsuario: idUsuario }, {$push: {listaProductos: {cantidad: params.cantidad, subTotal: subTotalF, producto: idProducto}}},
+            {new: true, useFindAndModify:false}, (err, productoGuardado)=>{
+                if(err) return res.status(500).send({ mensaje: 'Error en la peticion' });
+                if(!productoGuardado) return res.status(500).send({ mensaje: 'Error al ingresar los datos' });
+
+
+                var total = productoGuardado.total;
+                var parametroInt = parseInt(params.cantidad,10);
+                
+                Producto.findByIdAndUpdate(idProducto,{cantidad:productoEncontrado.cantidad-params.cantidad,cantidadVendida:productoEncontrado.cantidadVendida+parametroInt},
+                    (err, productoActualizado) =>{      })
+                Carrito.findOneAndUpdate({usuarioCarrito:idUsuario},{total:total+(precio*params.cantidad)},{new:true},(err,actualizado) => { 
+                    return res.status(200).send({CARRITO:actualizado});})
+            })
+
+    })
+
+}
 
 
 module.exports = {
@@ -164,5 +275,8 @@ module.exports = {
     registrarAdmin,
     eliminarUsuario,
     editarUsuario,
-    ascenderUsuario
+    ascenderUsuario,
+    eliminarCuenta,
+    editarCuenta,
+    agregarProductoCarrito
 }
