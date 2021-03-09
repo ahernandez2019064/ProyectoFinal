@@ -9,7 +9,8 @@ var CarritoSchema = Schema({
         subTotal: Number,
         producto: {type: Schema.ObjectId, ref: 'productos'}
     }],
-    carritoUsuario: {type: Schema.Types.ObjectId, ref: 'usuarios'}
+    carritoUsuario: {type: Schema.Types.ObjectId, ref: 'usuarios'},
+    total: Number
 })
 
 module.exports = mongoose.model('carritos', CarritoSchema);
