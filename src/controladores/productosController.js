@@ -74,8 +74,41 @@ function eliminarProducto(req, res) {
     }
 }
 
+function listarProductos(req, res) {
+    if(req.user.rol === 'ROL_ADMIN'){
+        Producto.find((err, productosEncontrados)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+            if(!productosEncontrados) return res.status(500).send({ mensaje: 'No se ha podido encontrar la categorias' })
+
+            return res.status(200).send({ productosEncontrados });
+        })
+    }else{
+        return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta accion' })
+    }
+    
+}
+
+function obtenerProductoId(req, res) {
+    var idProducto = req.params.id;
+    if(req.user.rol === 'ROL_ADMIN'){
+        Producto.findOne({ _id: idProducto }, (err, productoEncontrado)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de Productos'});
+            if(!productoEncontrado) return res.status(500).send({mensaje: 'Error al obtener el Producto' });
+
+            return res.status(200).send({ productoEncontrado });
+        })
+    }else{
+        return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta accion' })
+    }
+    
+
+}
+
+
 module.exports = {
     agregarProducto,
     editarProducto,
-    eliminarProducto
+    eliminarProducto,
+    listarProductos,
+    obtenerProductoId
 }
