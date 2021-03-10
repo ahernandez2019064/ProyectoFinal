@@ -18,7 +18,11 @@ function agregarProducto(req, res) {
             Producto.find({nombreProducto: productos.nombreProducto}).exec((err, productoAgregado)=>{
                 if(err) return res.status(500).send({ mensaje: 'Error en la peticion de agregar' });
                 if(productoAgregado && productoAgregado.length >= 1){
-                    return res.status(500).send({ mensaje: 'El producto '+params.nombreProducto+' ya existe' });
+                    var parametroInt = parseInt(params.cantidad,10);
+                    Producto.findByIdAndUpdate({nombreProducto: params.nombreProducto},{ cantidad: parametroInt + productoAgregado.cantidad }, {new: true}, (err, cantidadAgregada)=>{
+                        //if(err) return res.status(500).send({ mensaje: 'Error en la peticion' });
+                    });
+                    return res.status(200).send({ mensaje: 'Se han podido agregar las unidades' });
                 }else{
                     productos.save((err, productoGuardado)=>{
                         if(err) return res.status(500).send({ mesnaje: 'Error al guardar el producto' });
