@@ -19,5 +19,7 @@ app.delete('/eliminarCuenta/:id', md_autorizacion.ensureAuth, usuarioControlador
 app.put('/editarCuenta/:id', md_autorizacion.ensureAuth, usuarioControlador.editarCuenta);
 app.post('/registrarCliente', usuarioControlador.registrarCliente);
 app.put('/agregarAlCarrito/:id', md_autorizacion.ensureAuth, usuarioControlador.agregarProductoCarrito);
+app.get('/productoNombre', md_autorizacion.ensureAuth, usuarioControlador.obtenerProductosNombre);
+app.get('/productoXCategoria/:id', md_autorizacion.ensureAuth, usuarioControlador.productosXCategoria);
 
 module.exports = app;

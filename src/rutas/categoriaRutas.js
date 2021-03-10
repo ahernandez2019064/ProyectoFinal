@@ -11,5 +11,6 @@ app.post('/agregarCategoria', md_autorizacion.ensureAuth, categoriaControlador.a
 app.put('/editarCategoria/:id', md_autorizacion.ensureAuth, categoriaControlador.editarCategoria);
 app.get('/listarCategorias', md_autorizacion.ensureAuth, categoriaControlador.listarCategorias);
 app.delete('/eliminarCategoria/:id', md_autorizacion.ensureAuth, categoriaControlador.eliminarCategoria);
+app.get('/listarCategoriasClient', md_autorizacion.ensureAuth, categoriaControlador.listarCategoriasClientes);
 
 module.exports = app;
