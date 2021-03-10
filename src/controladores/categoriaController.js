@@ -64,6 +64,20 @@ function listarCategorias(req, res) {
     
 }
 
+function listarCategoriasClientes(req, res) {
+    if(req.user.rol === 'ROL_CLIENTE'){
+        Categoria.find((err, categoriasEncontradas)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+            if(!categoriasEncontradas) return res.status(500).send({ mensaje: 'No se ha podido encontrar la categorias' })
+
+            return res.status(200).send({ categoriasEncontradas });
+        })
+    }else{
+        return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta accion' })
+    }
+    
+}
+
 function categoriaDefault(req, res) {
     var nombreCategoria = 'Default';
     var categorias = new Categoria();
@@ -118,5 +132,6 @@ module.exports = {
     agregarCategoria,
     editarCategoria,
     listarCategorias,
-    eliminarCategoria
+    eliminarCategoria,
+    listarCategoriasClientes
 }
