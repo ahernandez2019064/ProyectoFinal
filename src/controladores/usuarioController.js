@@ -180,7 +180,7 @@ function registrarCliente(req, res){
                         if(err) return res.status(500).send({ mensaje: 'Error al guardar el usuario' });
 
                         if(usuarioGuardado){
-                            crearCarritos(carritoUsuario._id);
+                            crearCarritos(usuarioGuardado._id);
                             return res.status(200).send({ usuarioGuardado });
                         }else{
                             return res.status(500).send({ mensaje: 'No se ha podido regstrar este usuario' });
@@ -268,6 +268,33 @@ function agregarProductoCarrito(req, res) {
 
 }
 
+function obtenerProductosNombre(req, res) {
+    var params = req.body
+
+    if(req.user.sub === 'ROL_CLIENTE') return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta accion' });
+    Producto.find({ nombreProducto: params.nombreProducto} , (err, productoEncontrado)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion' });
+        if(!productoEncontrado) return res.status(500).send({mensaje: 'Error al obtener el Producto' });
+
+        return res.status(200).send({ productoEncontrado });
+    })
+}
+
+function productosXCategoria(req, res) {
+    var idCategoria = req.params.id;
+
+    if(req.user.rol != 'ROL_CLIENTE') return res.status(500).send({ mensaje: 'No posee los permisos para realizar esta accion' })
+
+    Producto.find({ categoria: idCategoria }, (err, productosEncontrados)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+        if(!productosEncontrados) return res.status(500).send({ mensaje: 'No se ha podido encontrar los productos' });
+
+        return res.status(200).send({ productosEncontrados });
+    })
+}
+
+
+
 
 module.exports = {
     login,
@@ -278,5 +305,7 @@ module.exports = {
     ascenderUsuario,
     eliminarCuenta,
     editarCuenta,
-    agregarProductoCarrito
+    agregarProductoCarrito,
+    obtenerProductosNombre,
+    productosXCategoria
 }
