@@ -14,15 +14,12 @@ function agregarProducto(req, res) {
             productos.precio = params.precio;
             productos.cantidad = params.cantidad;
             productos.categoria = idCategoria; 
+            productos.cantidadVendida = 0;
 
-            Producto.find({nombreProducto: productos.nombreProducto}).exec((err, productoAgregado)=>{
+            Producto.find({nombreProducto: productos.nombreProducto}, (err, productoAgregado)=>{
                 if(err) return res.status(500).send({ mensaje: 'Error en la peticion de agregar' });
                 if(productoAgregado && productoAgregado.length >= 1){
-                    var parametroInt = parseInt(params.cantidad,10);
-                    Producto.findByIdAndUpdate({nombreProducto: params.nombreProducto},{ cantidad: parametroInt + productoAgregado.cantidad }, {new: true}, (err, cantidadAgregada)=>{
-                        //if(err) return res.status(500).send({ mensaje: 'Error en la peticion' });
-                    });
-                    return res.status(200).send({ mensaje: 'Se han podido agregar las unidades' });
+                    return res.status(500).send({ mensaje: 'El producto '+params.nombreProducto +' ya existe' })
                 }else{
                     productos.save((err, productoGuardado)=>{
                         if(err) return res.status(500).send({ mesnaje: 'Error al guardar el producto' });
@@ -44,10 +41,11 @@ function editarProducto(req, res) {
     var idProducto = req.params.id;
     var params = req.body;
 
+    delete params.cantidad;
+
     if(req.user.rol === 'ROL_ADMIN'){
         Categoria.findById(params.categoria, (err, idVerificada)=>{
             if(err) return res.status(500).send({ mensaje: 'Error en la verifiacacion de Id' });
-            if(!idVerificada) return res.status(404).send({ mensaje: 'Este ID no existe' });
         })
 
         Producto.findByIdAndUpdate(idProducto, params, {new: true} , (err, productoEditado)=>{
@@ -108,11 +106,24 @@ function obtenerProductoId(req, res) {
 
 }
 
+function editarStock(req, res) {
+    var idProducto = req.params.id
+    var params = req.body
+
+    if(req.user.rol != 'ROL_ADMIN') return res.status(500).save({ mensaje: 'Solo los administradores tienen los permisos para realizar esta accion' });
+    Producto.findByIdAndUpdate(idProducto, { cantidad: params.cantidad }, { new: true }, (err, stockEditado)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de actualizacion' });
+        if(!stockEditado) return res.status(500).send({ mensaje: 'No se ha podido actualizar' });
+
+        return res.status(200).send({ stockEditado });
+    })
+}
 
 module.exports = {
     agregarProducto,
     editarProducto,
     eliminarProducto,
     listarProductos,
-    obtenerProductoId
+    obtenerProductoId,
+    editarStock
 }

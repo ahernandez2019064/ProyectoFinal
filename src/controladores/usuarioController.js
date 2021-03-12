@@ -2,6 +2,7 @@
 
 var Usuarios = require('../modelos/usuarioModel');
 var Carrito = require('../modelos/carritoModel');
+var Factura = require('../modelos/facturaModel');
 var Producto = require('../modelos/productoModel');
 const bcrypt = require('bcrypt-nodejs');
 const jwt = require('../servicios/jwt');
@@ -18,9 +19,25 @@ function login(req, res){
             bcrypt.compare(params.password, usuarioEncontrado.password, (err, passVerifacada)=>{
                 if(passVerifacada){
                     if(params.getToken === 'true'){
-                        return res.status(200).send({
-                            token: jwt.createToken(usuarioEncontrado)
-                        })
+                        if(usuarioEncontrado.rol === 'ROL_ADMIN'){
+                            return res.status(200).send({
+                                token: jwt.createToken(usuarioEncontrado)
+                            })
+                        }else if(usuarioEncontrado.rol === 'ROL_CLIENTE'){
+                            Factura.find({ facturaUsuario: usuarioEncontrado }, (err, facturasCompras)=>{
+                                if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' })
+                                if(facturasCompras.length == 0){
+                                    return res.status(500).send({
+                                        token: jwt.createToken(usuarioEncontrado), mensaje: 'Aun no has realizado compras :c ' 
+                                    })
+                                }
+                
+                                return res.status(200).send({
+                                    token: jwt.createToken(usuarioEncontrado), facturasCompras 
+                                })
+                            })
+                        }
+                        
                     }else{
                         usuarioEncontrado.password = undefined;
                         return res.status(200).send({ usuarioEncontrado });
@@ -67,7 +84,7 @@ function registrarCliente(req, res){
     }
 }
 
-function registrarAdmin(req, res) {
+function registrarAdmin(req, res){
     var params = req.body;
     var usuario = new Usuarios();
 
@@ -228,6 +245,7 @@ function editarCuenta(req, res) {
 function crearCarritos(usuarioId) {
     var carritos = new Carrito();
     carritos.carritoUsuario = usuarioId;
+    carritos.total = 0;
     carritos.save();
 }
 
@@ -236,36 +254,66 @@ function agregarProductoCarrito(req, res) {
     var idProducto = req.params.id
     var idUsuario = req.user.sub
 
-    if(req.user.rol != 'ROL_CLIENTE'){
-        return res.status(500).send({ mensaje: 'No posee los permisos para agregar productod' });
-    }
+    if(req.user.rol != 'ROL_CLIENTE') return res.status(500).send({ mensaje: 'No posee los permisos para agregar productod' });
 
     Producto.findById(idProducto).exec((err, productoEncontrado)=>{
         if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+
         if(productoEncontrado.cantidad < params.cantidad) return res.status(500).send({ mensaje: `No hay productos suficientes lo maximo que puede escoger es ${productoEncontrado.cantidad}` });
         if(!productoEncontrado) return res.status(500).send({ mensaje: 'Error al buscar el producto' });
-        if (productoEncontrado.cantidad == 0) return res.status(500).send({mensaje:'No hay prodctos en existencias'});
+        if (productoEncontrado.cantidad == 0) return res.status(500).send({mensaje:'No hay productos en existencia'});
 
+        var parametroInt = parseInt(params.cantidad,10);
         var precio = productoEncontrado.precio;
-        var subTotalF = params.cantidad * productoEncontrado.precio;
+        var subTotalF = parametroInt * precio;
+        precio = parseInt(precio, 10);
 
-        Carrito.findOneAndUpdate({ carritoUsuario: idUsuario }, {$push: {listaProductos: {cantidad: params.cantidad, subTotal: subTotalF, producto: idProducto}}},
-            {new: true, useFindAndModify:false}, (err, productoGuardado)=>{
-                if(err) return res.status(500).send({ mensaje: 'Error en la peticion' });
-                if(!productoGuardado) return res.status(500).send({ mensaje: 'Error al ingresar los datos' });
+        Carrito.findOne({carritoUsuario: idUsuario, "listaProductos.producto": idProducto}, (err, productoCarrito)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error al querer encontrar el producto' });
+            if(!productoCarrito){
+                Carrito.findOneAndUpdate({ carritoUsuario: idUsuario }, {$push: {listaProductos: {nombre: productoEncontrado.nombreProducto, precio: productoEncontrado.precio , cantidad: parametroInt, precio:  productoEncontrado.precio, subTotal: subTotalF, producto: idProducto}}},
+                {new: true, useFindAndModify:false}, (err, productoGuardado)=>{
+                    if(err) return res.status(500).send({ mensaje: 'Error en la peticion' });
+                    if(!productoGuardado) return res.status(500).send({ mensaje: 'Error al ingresar los datos' });
+                        var totalFinal = parseInt(productoGuardado.total, 10);
+                        var parametroInt = parseInt(params.cantidad, 10);
 
+                        Carrito.findOneAndUpdate({carritoUsuario: req.user.sub, "listaProductos.producto": idProducto}, {total: totalFinal+(precio*parametroInt)}, {new: true}, (err, carritoActualizado)=>{
+                            return res.status(200).send({ Carrito: carritoActualizado });
+                        })
+                })
+            }else{
+                var array = productoCarrito.listaProductos;
+                                
+                for (let casilla = 0; casilla < array.length; casilla ++){
+                    var stockArray = array[casilla].cantidad;
+                    var subTotaFlArray = array[casilla].subTotal;
+                    var productoIdArray = array[casilla].producto;
+                    
+                    if (req.params.id == productoIdArray) {
+                        array.forEach(function(objeto){
+                        if (objeto.producto == idProducto){
+                            Carrito.findOneAndUpdate({carritoUsuario: req.user.sub, "listaProductos.producto" : idProducto},
+                            {"listaProductos.$.cantidad":parametroInt+stockArray,"listaProductos.$.subTotal":subTotaFlArray+subTotalF},(err, productoAgregado) =>{
+                            if (err) return res.status(500).send({mensaje:'Error en la peticion'});
+                            if (!productoAgregado) return res.status(500).send({mensaje:'Error al ingresar los datos'});
+                                var total = parseInt(productoAgregado.total,10);
+                                var integerParam = parseInt(params.cantidad,10);
+                                Carrito.findOneAndUpdate({carritoUsuario:req.user.sub, "listaProductos.producto":idProducto},{total:total+(precio*integerParam)},
+                                {new:true},(err,carritoActualizado) => { return res.status(200).send({carritoActualizado});})
+                            })
+                        }
+                        })
+                    }else{
+                        console.log('error')
+                    }
+                }
+            }
+        })
+    
+        
 
-                var total = productoGuardado.total;
-                var parametroInt = parseInt(params.cantidad,10);
-                
-                Producto.findByIdAndUpdate(idProducto,{cantidad:productoEncontrado.cantidad-params.cantidad,cantidadVendida:productoEncontrado.cantidadVendida+parametroInt},
-                    (err, productoActualizado) =>{      })
-                Carrito.findOneAndUpdate({usuarioCarrito:idUsuario},{total:total+(precio*params.cantidad)},{new:true},(err,actualizado) => { 
-                    return res.status(200).send({CARRITO:actualizado});})
-            })
-
-    })
-
+    })    
 }
 
 function obtenerProductosNombre(req, res) {
@@ -293,6 +341,93 @@ function productosXCategoria(req, res) {
     })
 }
 
+function productosAgotados(req, res) {
+
+    if(req.user.rol != 'ROL_ADMIN') return res.status(500).send({ mensaje: 'No posee los permisos para realizar esta accion' })
+        Producto.find({cantidad: 0} , (err, productosVacios)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+            if(!productosVacios) return res.status(500).send({ mensaje: 'Todos los productos tienen existencias' })
+            
+            return res.status(200).send({ productosVacios });
+        })
+}
+
+function generarFactura(req, res) {
+    var facturas = new Factura();
+
+    if(req.user.rol != 'ROL_CLIENTE') return res.status(500).send({ mensaje: 'No posee los permisos para realizar esta accion' })
+    Carrito.findOne({carritoUsuario: req.user.sub}, (err, carritoEncontrado)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' })
+        if(!carritoEncontrado) return res.status(500).send({ mensaje: 'No se ha podido encontrar el cliente' })
+
+        facturas.total = carritoEncontrado.total;
+        facturas.listaProductos = carritoEncontrado.listaProductos;
+        facturas.facturaUsuario = carritoEncontrado.carritoUsuario;
+
+        facturas.save((err, facturaGuardada)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de guardar' });
+
+            var arrayProductos = carritoEncontrado.listaProductos
+            arrayProductos.forEach(function(elemento){
+                Producto.findById(elemento.producto, (err, productosEncontrados)=>{
+                    if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+                    if(!productosEncontrados) return res.status(500).send({ mensjae: 'No se ha podido encontrar el producto' });
+                    
+
+                    Producto.findByIdAndUpdate(elemento.producto, {cantidad: productosEncontrados.cantidad - elemento.cantidad, cantidadVendida: productosEncontrados.cantidadVendida + elemento.cantidad}, (err, productoActualizado)=>{ })
+                })
+            }) 
+
+            Carrito.findOneAndUpdate({carritoUsuario: req.user.sub}, {$set:{listaProductos:[]}, total: 0}, (err, vaciarCarrito)=>{ 
+            });
+
+            if(facturaGuardada){
+                return res.status(500).send({ facturaGuardada })
+            }
+        });
+    })
+}
+
+function facturasUsuarios(req, res){
+    if(req.user.rol === 'ROL_ADMIN'){
+        Factura.find( (err, facturasCompras)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' })
+            if(facturasCompras.length == 0){
+                return res.status(500).send({ mensaje: 'Aun no has realizado compras :c ' })
+            }
+
+            return res.status(200).send({ facturasCompras })
+        })
+    }else{
+        return res.status(500).send({ mensaje: 'Solo los clientes pueden realizar sus compras y visializarlas' })
+    }
+}
+
+function productosFacturas(req, res) {
+    var idFactura = req.params.id
+
+    if(req.user.rol != 'ROL_ADMIN') return res.status(500).send({ mensaje: 'Usted no posee los permiso para realizar esta accion' });
+
+    Factura.find({ _id: idFactura },{ "listaProductos.nombre": 1, "listaProductos.precio": 1, "listaProductos.cantidad": 1 , "listaProductos.subTotal": 1} , (err, facturaEncontrada)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+        if(!facturaEncontrada) return res.status(500).send({ mensaje: 'No se ha podido encontrar la factura' })
+                    
+        return res.status(200).send({ facturaEncontrada });
+    })
+            
+
+
+    
+}
+
+function productosMasVendidos(req, res){
+    Producto.find({},(err, productosEncontrados)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de la busqueda' })
+        if(!productosEncontrados) return res.status(500).send({ mensaje: 'No se ha podido realizar la busqueda' })
+
+        return res.status(200).send({ productosEncontrados });
+    }).sort({cantidadVendida: -1}).limit(3);
+}
 
 
 
@@ -307,5 +442,10 @@ module.exports = {
     editarCuenta,
     agregarProductoCarrito,
     obtenerProductosNombre,
-    productosXCategoria
+    productosXCategoria,
+    productosAgotados,
+    generarFactura,
+    facturasUsuarios,
+    productosFacturas,
+    productosMasVendidos
 }
