@@ -5,6 +5,8 @@ var Schema = mongoose.Schema;
 
 var FacturaSchema = Schema ({
     listaProductos:[{
+        nombre:String,
+        precio: String,
         cantidad: Number,
         subTotal: Number,
         producto: {type: Schema.ObjectId, ref: 'productos'}
