@@ -175,6 +175,34 @@ function ascenderUsuario(req, res) {
     }
 }
 
+function productosFacturas(req, res) {
+    var idFactura = req.params.id
+
+    if(req.user.rol != 'ROL_ADMIN') return res.status(500).send({ mensaje: 'Usted no posee los permiso para realizar esta accion' });
+
+    Factura.find({ _id: idFactura },{ "listaProductos.nombre": 1, "listaProductos.precio": 1, "listaProductos.cantidad": 1 , "listaProductos.subTotal": 1} , (err, facturaEncontrada)=>{
+        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
+        if(!facturaEncontrada) return res.status(500).send({ mensaje: 'No se ha podido encontrar la factura' })
+                    
+        return res.status(200).send({ facturaEncontrada });
+    })
+}
+
+function facturasUsuarios(req, res){
+    if(req.user.rol === 'ROL_ADMIN'){
+        Factura.find( (err, facturasCompras)=>{
+            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' })
+            if(facturasCompras.length == 0){
+                return res.status(500).send({ mensaje: 'Aun no has realizado compras :c ' })
+            }
+
+            return res.status(200).send({ facturasCompras })
+        })
+    }else{
+        return res.status(500).send({ mensaje: 'Solo los clientes pueden realizar sus compras y visializarlas' })
+    }
+}
+
 // CRUD CLIENTE
 function registrarCliente(req, res){
     var usuario = new Usuarios();
@@ -289,7 +317,14 @@ function agregarProductoCarrito(req, res) {
                     var stockArray = array[casilla].cantidad;
                     var subTotaFlArray = array[casilla].subTotal;
                     var productoIdArray = array[casilla].producto;
+
+                    var integerParam = parseInt(params.cantidad,10);
                     
+                    var cantidadTotal = stockArray + integerParam;
+                    if(cantidadTotal > productoEncontrado.cantidad){
+                        return res.status(500).send({ mensaje: 'No se puede pedir mas cantidad de la que hay en el stock' })
+                    }
+
                     if (req.params.id == productoIdArray) {
                         array.forEach(function(objeto){
                         if (objeto.producto == idProducto){
@@ -386,38 +421,6 @@ function generarFactura(req, res) {
             }
         });
     })
-}
-
-function facturasUsuarios(req, res){
-    if(req.user.rol === 'ROL_ADMIN'){
-        Factura.find( (err, facturasCompras)=>{
-            if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' })
-            if(facturasCompras.length == 0){
-                return res.status(500).send({ mensaje: 'Aun no has realizado compras :c ' })
-            }
-
-            return res.status(200).send({ facturasCompras })
-        })
-    }else{
-        return res.status(500).send({ mensaje: 'Solo los clientes pueden realizar sus compras y visializarlas' })
-    }
-}
-
-function productosFacturas(req, res) {
-    var idFactura = req.params.id
-
-    if(req.user.rol != 'ROL_ADMIN') return res.status(500).send({ mensaje: 'Usted no posee los permiso para realizar esta accion' });
-
-    Factura.find({ _id: idFactura },{ "listaProductos.nombre": 1, "listaProductos.precio": 1, "listaProductos.cantidad": 1 , "listaProductos.subTotal": 1} , (err, facturaEncontrada)=>{
-        if(err) return res.status(500).send({ mensaje: 'Error en la peticion de busqueda' });
-        if(!facturaEncontrada) return res.status(500).send({ mensaje: 'No se ha podido encontrar la factura' })
-                    
-        return res.status(200).send({ facturaEncontrada });
-    })
-            
-
-
-    
 }
 
 function productosMasVendidos(req, res){

@@ -46,7 +46,8 @@ function editarProducto(req, res) {
     if(req.user.rol === 'ROL_ADMIN'){
         Categoria.findById(params.categoria, (err, idVerificada)=>{
             if(err) return res.status(500).send({ mensaje: 'Error en la verifiacacion de Id' });
-        })
+
+        
 
         Producto.findByIdAndUpdate(idProducto, params, {new: true} , (err, productoEditado)=>{
             if(err) return res.status(500).send({ mensaje: 'Error al editar el producto' });
@@ -54,10 +55,12 @@ function editarProducto(req, res) {
 
             return res.status(200).send({ productoEditado });
         })
+    })
 
     }else{
         return res.status(500).send({ mensaje: 'Usted no posee los permisos para realizar esta accion' });
     }
+    
     
 }
 
